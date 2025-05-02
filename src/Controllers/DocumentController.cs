@@ -55,7 +55,9 @@ namespace DocumentAnalyzerApi.Controllers
                         resultDto = new DocumentResultDto
                         {
                             ModelUsed = model,
-                            DocumentType = doc.DocumentType
+                            DocumentType = doc.DocumentType,
+                            Fields = new Dictionary<string, string>(),
+                            Items = new List<Dictionary<string, string>>()
                         };
 
                         foreach (var field in doc.Fields)
@@ -68,12 +70,12 @@ namespace DocumentAnalyzerApi.Controllers
                             var tables = new List<Dictionary<string, string>>();
                             foreach (var table in result.Tables)
                             {
-                                foreach (var rowGroup in table.Cells.GroupBy(c => c.RowIndex))
+                                foreach (var rowGroup in table.Cells.GroupBy(c => c.RowIndex).OrderBy(g => g.Key))
                                 {
                                     var row = new Dictionary<string, string>();
-                                    foreach (var cell in rowGroup)
+                                    foreach (var cell in rowGroup.OrderBy(c => c.ColumnIndex))
                                     {
-                                        row[$"Column{cell.ColumnIndex}"] = cell.Content?.Replace("\n", " ").Trim();
+                                        row[$"Column{cell.ColumnIndex + 1}"] = cell.Content?.Replace("\n", " ").Trim();
                                     }
                                     tables.Add(row);
                                 }
@@ -100,6 +102,13 @@ namespace DocumentAnalyzerApi.Controllers
             return new JsonResult(resultDto); // Default to JSON
         }
 
+    }
 
+    public class DocumentResultDto
+    {
+        public string ModelUsed { get; set; }
+        public string DocumentType { get; set; }
+        public Dictionary<string, string> Fields { get; set; }
+        public List<Dictionary<string, string>> Items { get; set; }
     }
 }

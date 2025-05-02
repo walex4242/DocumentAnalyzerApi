@@ -1,0 +1,153 @@
+@page "/"
+@inject HttpClient Http
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using System.Net.Http.Json
+@using System.Text.Json;
+@using System.Collections.Generic;
+
+<PageTitle>Document Analyzer</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-lg">
+                <div class="card-header bg-dark text-white text-center">
+                    <h3 class="mb-0">Document Analysis</h3>
+                </div>
+                <div class="card-body">
+
+                    <div class="mb-3">
+                        <h5>Carregar um arquivo para análise:</h5>
+                        <InputFile OnChange="@UploadFile" accept=".pdf,.jpg,.jpeg,.png" class="form-control" />
+                    </div>
+
+                    @if (IsLoading)
+                    {
+                        <div class="text-center my-3">
+                            <div class="spinner-border text-dark" role="status">
+                                <span class="visually-hidden">Analisando documento...</span>
+                            </div>
+                            <p class="mt-2">Analisando o documento com os modelos de IA...</p>
+                        </div>
+                    }
+
+                    @if (AnalysisResult != null)
+                    {
+                        <h4 class="mt-3">Resultado da Análise:</h4>
+                        <p><strong>Modelo Utilizado:</strong> @AnalysisResult.ModelUsed</p>
+                        @if (!string.IsNullOrEmpty(AnalysisResult.DocumentType))
+                        {
+                            <p><strong>Tipo de Documento:</strong> @AnalysisResult.DocumentType</p>
+                        }
+
+                        @if (AnalysisResult.Fields != null && AnalysisResult.Fields.Any())
+                        {
+                            <h5 class="mt-2">Campos Extraídos:</h5>
+                            <ul class="list-group">
+                                @foreach (var field in AnalysisResult.Fields)
+                                {
+                                    <li class="list-group-item"><strong>@field.Key:</strong> @field.Value</li>
+                                }
+                            </ul>
+                        }
+
+                        @if (AnalysisResult.Items != null && AnalysisResult.Items.Any())
+                        {
+                            <h5 class="mt-3">Tabelas Extraídas:</h5>
+                            @foreach (var table in AnalysisResult.Items)
+                            {
+                                <table class="table table-bordered mt-2">
+                                    <thead>
+                                        <tr>
+                                            @foreach (var key in table.Keys.OrderBy(k => int.TryParse(k.Substring(6), out var n) ? n : 0))
+                                            {
+                                                <th>@key</th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            @foreach (var key in table.Keys.OrderBy(k => int.TryParse(k.Substring(6), out var n) ? n : 0))
+                                            {
+                                                <td>@table[key]</td>
+                                            }
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            }
+                        }
+                    }
+
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <div class="alert alert-danger mt-3">@ErrorMessage</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private DocumentResultDto AnalysisResult { get; set; }
+    private string ErrorMessage = "";
+    private bool IsLoading = false;
+
+    private async Task UploadFile(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        IsLoading = true;
+        ErrorMessage = "";
+        AnalysisResult = null;
+        StateHasChanged();
+
+        try
+        {
+            var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(file.OpenReadStream(file.Size));
+            content.Add(fileContent, "file", file.Name);
+
+            var response = await Http.PostAsync("/document/analyze-document", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    AnalysisResult = JsonSerializer.Deserialize<DocumentResultDto>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                }
+                catch (JsonException ex)
+                {
+                    ErrorMessage = $"Erro ao processar a resposta JSON: {ex.Message}";
+                }
+            }
+            else
+            {
+                ErrorMessage = $"Erro na requisição: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ocorreu um erro inesperado: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged(); // Force UI update
+        }
+    }
+
+    public class DocumentResultDto
+    {
+        public string ModelUsed { get; set; }
+        public string DocumentType { get; set; }
+        public Dictionary<string, string> Fields { get; set; }
+        public List<Dictionary<string, string>> Items { get; set; }
+    }
+}
