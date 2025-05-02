@@ -1,0 +1,342 @@
+K0dak_3_Mgs11
+--------------------------------------------
+prebuilt-idDocument
+/*
+  This code sample shows Prebuilt ID Document operations with the Azure AI Document Intelligence client library.
+
+  To learn more, please visit the documentation - Quickstart: Document Intelligence (formerly Form Recognizer) SDKs
+  https://learn.microsoft.com/azure/ai-services/document-intelligence/quickstarts/get-started-sdks-rest-api?pivots=programming-language-csharp
+*/
+
+using Azure;
+using Azure.AI.DocumentIntelligence;
+
+/*
+  Remember to remove the key from your code when you're done, and never post it publicly. For production, use
+  secure methods to store and access your credentials. For more information, see 
+  https://docs.microsoft.com/en-us/azure/cognitive-services/cognitive-services-security?tabs=command-line%2Ccsharp#environment-variables-and-application-configuration
+*/
+string endpoint = "YOUR_FORM_RECOGNIZER_ENDPOINT";
+string key = "YOUR_FORM_RECOGNIZER_KEY";
+AzureKeyCredential credential = new AzureKeyCredential(key);
+DocumentIntelligenceClient client = new DocumentIntelligenceClient(new Uri(endpoint), credential);
+
+// sample document
+Uri idDocumentUri = new Uri("https://raw.githubusercontent.com/Azure-Samples/cognitive-services-REST-api-samples/master/curl/form-recognizer/DriverLicense.png");
+
+Operation<AnalyzeResult> operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-idDocument", idDocumentUri);
+
+AnalyzeResult identityDocuments = operation.Value;
+
+// To see the list of all the supported fields returned by service and its corresponding types, consult:
+// https://aka.ms/formrecognizer/iddocumentfields
+
+AnalyzedDocument identityDocument = identityDocuments.Documents.Single();
+
+if (identityDocument.Fields.TryGetValue("Address", out DocumentField addressField))
+{
+    if (addressField.FieldType == DocumentFieldType.Address)
+    {
+        Console.WriteLine($"Address: '{addressField.Content}', with confidence {addressField.Confidence}");
+    }
+}
+
+if (identityDocument.Fields.TryGetValue("CountryRegion", out DocumentField countryRegionField))
+{
+    if (countryRegionField.FieldType == DocumentFieldType.CountryRegion)
+    {
+        string countryRegion = countryRegionField.ValueCountryRegion;
+        Console.WriteLine($"CountryRegion: '{countryRegion}', with confidence {countryRegionField.Confidence}");
+    }
+}
+
+if (identityDocument.Fields.TryGetValue("DateOfBirth", out DocumentField dateOfBirthField))
+{
+    if (dateOfBirthField.FieldType == DocumentFieldType.Date)
+    {
+        DateTimeOffset? dateOfBirth = dateOfBirthField.ValueDate;
+        Console.WriteLine($"Date Of Birth: '{dateOfBirth}', with confidence {dateOfBirthField.Confidence}");
+    }
+}
+
+if (identityDocument.Fields.TryGetValue("DateOfExpiration", out DocumentField dateOfExpirationField))
+{
+    if (dateOfExpirationField.FieldType == DocumentFieldType.Date)
+    {
+        DateTimeOffset? dateOfExpiration = dateOfExpirationField.ValueDate;
+        Console.WriteLine($"Date Of Expiration: '{dateOfExpiration}', with confidence {dateOfExpirationField.Confidence}");
+    }
+}
+
+if (identityDocument.Fields.TryGetValue("DocumentNumber", out DocumentField documentNumberField))
+{
+    if (documentNumberField.FieldType == DocumentFieldType.String)
+    {
+        string documentNumber = documentNumberField.ValueString;
+        Console.WriteLine($"Document Number: '{documentNumber}', with confidence {documentNumberField.Confidence}");
+    }
+}
+
+if (identityDocument.Fields.TryGetValue("FirstName", out DocumentField firstNameField))
+{
+    if (firstNameField.FieldType == DocumentFieldType.String)
+    {
+        string firstName = firstNameField.ValueString;
+        Console.WriteLine($"First Name: '{firstName}', with confidence {firstNameField.Confidence}");
+    }
+}
+
+if (identityDocument.Fields.TryGetValue("LastName", out DocumentField lastNameField))
+{
+    if (lastNameField.FieldType == DocumentFieldType.String)
+    {
+        string lastName = lastNameField.ValueString;
+        Console.WriteLine($"Last Name: '{lastName}', with confidence {lastNameField.Confidence}");
+    }
+}
+
+if (identityDocument.Fields.TryGetValue("Region", out DocumentField regionfield))
+{
+    if (regionfield.FieldType == DocumentFieldType.String)
+    {
+        string region = regionfield.ValueString;
+        Console.WriteLine($"Region: '{region}', with confidence {regionfield.Confidence}");
+    }
+}
+
+if (identityDocument.Fields.TryGetValue("Sex", out DocumentField sexfield))
+{
+    if (sexfield.FieldType == DocumentFieldType.String)
+    {
+        string sex = sexfield.ValueString;
+        Console.WriteLine($"Sex: '{sex}', with confidence {sexfield.Confidence}");
+    }
+}
+
+-------------------------------------------------------------
+prebuilt-invoice
+
+/*
+  This code sample shows Prebuilt Invoice operations with the Azure AI Document Intelligence client library. 
+
+  To learn more, please visit the documentation - Quickstart: Document Intelligence (formerly Form Recognizer) SDKs
+  https://learn.microsoft.com/azure/ai-services/document-intelligence/quickstarts/get-started-sdks-rest-api?pivots=programming-language-csharp
+*/
+
+using Azure;
+using Azure.AI.DocumentIntelligence;
+
+/*
+  Remember to remove the key from your code when you're done, and never post it publicly. For production, use
+  secure methods to store and access your credentials. For more information, see 
+  https://docs.microsoft.com/en-us/azure/cognitive-services/cognitive-services-security?tabs=command-line%2Ccsharp#environment-variables-and-application-configuration
+*/
+string endpoint = "YOUR_FORM_RECOGNIZER_ENDPOINT";
+string key = "YOUR_FORM_RECOGNIZER_KEY";
+AzureKeyCredential credential = new AzureKeyCredential(key);
+DocumentIntelligenceClient client = new DocumentIntelligenceClient(new Uri(endpoint), credential);
+
+// sample document
+Uri invoiceUri = new Uri("https://raw.githubusercontent.com/Azure-Samples/cognitive-services-REST-api-samples/master/curl/form-recognizer/sample-invoice.pdf");
+
+Operation<AnalyzeResult> operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-invoice", invoiceUri);
+
+AnalyzeResult result = operation.Value;
+
+for (int i = 0; i < result.Documents.Count; i++)
+{
+    Console.WriteLine($"Document {i}:");
+
+    AnalyzedDocument document = result.Documents[i];
+
+    if (document.Fields.TryGetValue("VendorName", out DocumentField? vendorNameField))
+    {
+        if (vendorNameField.FieldType == DocumentFieldType.String)
+        {
+            string vendorName = vendorNameField.ValueString;
+            Console.WriteLine($"Vendor Name: '{vendorName}', with confidence {vendorNameField.Confidence}");
+        }
+    }
+
+    if (document.Fields.TryGetValue("CustomerName", out DocumentField? customerNameField))
+    {
+        if (customerNameField.FieldType == DocumentFieldType.String)
+        {
+            string customerName = customerNameField.ValueString;
+            Console.WriteLine($"Customer Name: '{customerName}', with confidence {customerNameField.Confidence}");
+        }
+    }
+
+    if (document.Fields.TryGetValue("Items", out DocumentField? itemsField))
+    {
+        if (itemsField.FieldType == DocumentFieldType.List)
+        {
+            foreach (DocumentField itemField in itemsField.ValueList)
+            {
+                Console.WriteLine("Item:");
+
+                if (itemField.FieldType == DocumentFieldType.Dictionary)
+                {
+                    IReadOnlyDictionary<string, DocumentField> itemFields = itemField.ValueDictionary;
+
+                    if (itemFields.TryGetValue("Description", out DocumentField? itemDescriptionField))
+                    {
+                        if (itemDescriptionField.FieldType == DocumentFieldType.String)
+                        {
+                            string itemDescription = itemDescriptionField.ValueString;
+
+                            Console.WriteLine($"  Description: '{itemDescription}', with confidence {itemDescriptionField.Confidence}");
+                        }
+                    }
+
+                    if (itemFields.TryGetValue("Amount", out DocumentField? itemAmountField))
+                    {
+                        if (itemAmountField.FieldType == DocumentFieldType.Currency)
+                        {
+                            CurrencyValue itemAmount = itemAmountField.ValueCurrency;
+
+                            Console.WriteLine($"  Amount: '{itemAmount.CurrencySymbol}{itemAmount.Amount}', with confidence {itemAmountField.Confidence}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (document.Fields.TryGetValue("SubTotal", out DocumentField? subTotalField))
+    {
+        if (subTotalField.FieldType == DocumentFieldType.Currency)
+        {
+            CurrencyValue subTotal = subTotalField.ValueCurrency;
+            Console.WriteLine($"Sub Total: '{subTotal.CurrencySymbol}{subTotal.Amount}', with confidence {subTotalField.Confidence}");
+        }
+    }
+
+    if (document.Fields.TryGetValue("TotalTax", out DocumentField? totalTaxField))
+    {
+        if (totalTaxField.FieldType == DocumentFieldType.Currency)
+        {
+            CurrencyValue totalTax = totalTaxField.ValueCurrency;
+            Console.WriteLine($"Total Tax: '{totalTax.CurrencySymbol}{totalTax.Amount}', with confidence {totalTaxField.Confidence}");
+        }
+    }
+
+    if (document.Fields.TryGetValue("InvoiceTotal", out DocumentField? invoiceTotalField))
+    {
+        if (invoiceTotalField.FieldType == DocumentFieldType.Currency)
+        {
+            CurrencyValue invoiceTotal = invoiceTotalField.ValueCurrency;
+            Console.WriteLine($"Invoice Total: '{invoiceTotal.CurrencySymbol}{invoiceTotal.Amount}', with confidence {invoiceTotalField.Confidence}");
+        }
+    }
+}
+
+-----------------------------------------------------------------
+prebuilt-receipt
+
+/*
+  This code sample shows Prebuilt Receipt operations with the Azure AI Document Intelligence client library. 
+
+  To learn more, please visit the documentation - Quickstart: Document Intelligence (formerly Form Recognizer) SDKs
+  https://learn.microsoft.com/azure/ai-services/document-intelligence/quickstarts/get-started-sdks-rest-api?pivots=programming-language-csharp
+*/
+
+using Azure;
+using Azure.AI.DocumentIntelligence;
+
+/*
+  Remember to remove the key from your code when you're done, and never post it publicly. For production, use
+  secure methods to store and access your credentials. For more information, see 
+  https://docs.microsoft.com/en-us/azure/cognitive-services/cognitive-services-security?tabs=command-line%2Ccsharp#environment-variables-and-application-configuration
+*/
+string endpoint = "YOUR_FORM_RECOGNIZER_ENDPOINT";
+string apiKey = "YOUR_FORM_RECOGNIZER_KEY";
+AzureKeyCredential credential = new AzureKeyCredential(key);
+DocumentIntelligenceClient client = new DocumentIntelligenceClient(new Uri(endpoint), credential);
+
+//sample document
+Uri receiptUri = new Uri("https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/formrecognizer/azure-ai-formrecognizer/tests/sample_forms/receipt/contoso-receipt.png");
+
+Operation<AnalyzeResult> operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-receipt", receiptUri);
+
+AnalyzeResult receipts = operation.Value;
+
+// To see the list of the supported fields returned by service and its corresponding types, consult:
+// https://aka.ms/formrecognizer/receiptfields
+
+foreach (AnalyzedDocument receipt in receipts.Documents)
+{
+    if (receipt.Fields.TryGetValue("MerchantName", out DocumentField merchantNameField))
+    {
+        if (merchantNameField.FieldType == DocumentFieldType.String)
+        {
+            string merchantName = merchantNameField.ValueString;
+
+            Console.WriteLine($"Merchant Name: '{merchantName}', with confidence {merchantNameField.Confidence}");
+        }
+    }
+
+    if (receipt.Fields.TryGetValue("TransactionDate", out DocumentField transactionDateField))
+    {
+        if (transactionDateField.FieldType == DocumentFieldType.Date)
+        {
+            DateTimeOffset? transactionDate = transactionDateField.ValueDate;
+
+            Console.WriteLine($"Transaction Date: '{transactionDate}', with confidence {transactionDateField.Confidence}");
+        }
+    }
+
+    if (receipt.Fields.TryGetValue("Items", out DocumentField itemsField))
+    {
+        if (itemsField.FieldType == DocumentFieldType.List)
+        {
+            foreach (DocumentField itemField in itemsField.ValueList)
+            {
+                Console.WriteLine("Item:");
+
+                if (itemField.FieldType == DocumentFieldType.Dictionary)
+                {
+                    IReadOnlyDictionary<string, DocumentField> itemFields = itemField.ValueDictionary;
+
+                    if (itemFields.TryGetValue("Description", out DocumentField itemDescriptionField))
+                    {
+                        if (itemDescriptionField.FieldType == DocumentFieldType.String)
+                        {
+                            string itemDescription = itemDescriptionField.ValueString;
+
+                            Console.WriteLine($"  Description: '{itemDescription}', with confidence {itemDescriptionField.Confidence}");
+                        }
+                    }
+
+                    if (itemFields.TryGetValue("TotalPrice", out DocumentField itemTotalPriceField))
+                    {
+                        if (itemTotalPriceField.FieldType == DocumentFieldType.Currency)
+                        {
+                            double? itemTotalPrice = itemTotalPriceField.ValueCurrency.Amount;
+
+                            Console.WriteLine($"  Total Price: '{itemTotalPrice}', with confidence {itemTotalPriceField.Confidence}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (receipt.Fields.TryGetValue("Total", out DocumentField totalField))
+    {
+        if (totalField.FieldType == DocumentFieldType.Currency)
+        {
+            double total = totalField.ValueCurrency.Amount;
+
+            Console.WriteLine($"Total: '{total}', with confidence '{totalField.Confidence}'");
+        }
+    }
+}
+
+------------------------------------------------------------
+prebuilt-businessCard
+
+
+
+--------------------------------------------------------------------
+prebuilt-document
