@@ -2,15 +2,14 @@ using Azure;
 using Azure.AI.FormRecognizer.DocumentAnalysis;
 using Microsoft.AspNetCore.Mvc;
 
-
 namespace DocumentAnalyzerApi.Controllers
 {
     [ApiController]
     [Route("[controller]")]
     public class DocumentController : ControllerBase
     {
-        private readonly string endpoint = "https://neutronrecoginer.cognitiveservices.azure.com/";
-        private readonly string apiKey = "2j5rvtGs4MrtKUfQubwmhyd1Phe9HXsFcSW6BVg7yXK89BAQa1uJJQQJ99BDACZoyfiXJ3w3AAALACOG2HDn";
+        private readonly string endpoint = "https://neutronrecoginer.cognitiveservices.azure.com/"; // Replace with your endpoint
+        private readonly string apiKey = "2j5rvtGs4MrtKUfQubwmhyd1Phe9HXsFcSW6BVg7yXK89BAQa1uJJQQJ99BDACZoyfiXJ3w3AAALACOG2HDn";     // Replace with your API key
 
         [HttpPost("analyze-document")]
         [Consumes("multipart/form-data")]
@@ -30,70 +29,102 @@ namespace DocumentAnalyzerApi.Controllers
                 fileBytes = ms.ToArray();
             }
 
-            var modelCandidates = new[]
-            {
-        "prebuilt-invoice",
-        "prebuilt-receipt",
-        "prebuilt-idDocument",
-        "prebuilt-businessCard",
-        "prebuilt-document"
-    };
-
             DocumentResultDto resultDto = null;
+            string modelUsed = null;
 
-            foreach (var model in modelCandidates)
+            // Try analyzing with the ID Document model first
+            using (var modelStream = new MemoryStream(fileBytes))
             {
-                using var modelStream = new MemoryStream(fileBytes);
                 try
                 {
-                    var operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, model, modelStream);
+                    var operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-idDocument", modelStream);
                     var result = operation.Value;
 
-                    var doc = result.Documents.FirstOrDefault();
-                    if (doc != null && doc.Fields.Count > 0)
+                    if (result.Documents.FirstOrDefault()?.Fields.Count > 0)
                     {
-                        resultDto = new DocumentResultDto
-                        {
-                            ModelUsed = model,
-                            DocumentType = doc.DocumentType,
-                            Fields = new Dictionary<string, string>(),
-                            Items = new List<Dictionary<string, string>>()
-                        };
-
-                        foreach (var field in doc.Fields)
-                        {
-                            resultDto.Fields[field.Key] = field.Value.Content?.Replace("\n", " ").Trim();
-                        }
-
-                        if (result.Tables.Count > 0)
-                        {
-                            var tables = new List<Dictionary<string, string>>();
-                            foreach (var table in result.Tables)
-                            {
-                                foreach (var rowGroup in table.Cells.GroupBy(c => c.RowIndex).OrderBy(g => g.Key))
-                                {
-                                    var row = new Dictionary<string, string>();
-                                    foreach (var cell in rowGroup.OrderBy(c => c.ColumnIndex))
-                                    {
-                                        row[$"Column{cell.ColumnIndex + 1}"] = cell.Content?.Replace("\n", " ").Trim();
-                                    }
-                                    tables.Add(row);
-                                }
-                            }
-                            resultDto.Items = tables;
-                        }
-
-                        break;
+                        resultDto = CreateDocumentResultDto("prebuilt-idDocument", result.Documents.First());
+                        modelUsed = "prebuilt-idDocument";
                     }
                 }
                 catch
                 {
-                    continue;
+                    // Ignore and try the next model
+                }
+            }
+
+            // If ID Document didn't yield results, try the Invoice model
+            if (resultDto == null)
+            {
+                using (var modelStream = new MemoryStream(fileBytes))
+                {
+                    try
+                    {
+                        var operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-invoice", modelStream);
+                        var result = operation.Value;
+
+                        if (result.Documents.FirstOrDefault()?.Fields.Count > 0)
+                        {
+                            resultDto = CreateDocumentResultDto("prebuilt-invoice", result.Documents.First(), result.Tables);
+                            modelUsed = "prebuilt-invoice";
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore and try the next model
+                    }
+                }
+            }
+
+            // If Invoice didn't yield results, try the Receipt model
+            if (resultDto == null)
+            {
+                using (var modelStream = new MemoryStream(fileBytes))
+                {
+                    try
+                    {
+                        var operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-receipt", modelStream);
+                        var result = operation.Value;
+
+                        if (result.Documents.FirstOrDefault()?.Fields.Count > 0)
+                        {
+                            resultDto = CreateDocumentResultDto("prebuilt-receipt", result.Documents.First(), result.Tables);
+                            modelUsed = "prebuilt-receipt";
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore and try the next model
+                    }
+                }
+            }
+
+            // Finally, try the general Document model
+            if (resultDto == null)
+            {
+                using (var modelStream = new MemoryStream(fileBytes))
+                {
+                    try
+                    {
+                        var operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-document", modelStream);
+                        var result = operation.Value;
+
+                        if (result.Documents.FirstOrDefault()?.Fields.Count > 0)
+                        {
+                            resultDto = CreateDocumentResultDto("prebuilt-document", result.Documents.First(), result.Tables);
+                            modelUsed = "prebuilt-document";
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore if even the general model fails
+                    }
                 }
             }
 
             if (resultDto == null)
-                return BadRequest("Could not extract any data using prebuilt models.");
+                return BadRequest("Could not extract any relevant data using the prebuilt models for ID documents, invoices, or receipts.");
+
+            resultDto.ModelUsed = modelUsed; // Ensure the ModelUsed is correctly set
 
             // Support for XML/XAML or JSON
             if (format.ToLower() == "xaml" || format.ToLower() == "xml")
@@ -102,13 +133,40 @@ namespace DocumentAnalyzerApi.Controllers
             return new JsonResult(resultDto); // Default to JSON
         }
 
-    }
+        private DocumentResultDto CreateDocumentResultDto(string modelName, AnalyzedDocument document, IReadOnlyList<DocumentTable> tables = null)
+        {
+            var resultDto = new DocumentResultDto
+            {
+                ModelUsed = modelName,
+                DocumentType = document.DocumentType,
+                Fields = new Dictionary<string, string>(),
+                Items = new List<Dictionary<string, string>>()
+            };
 
-    public class DocumentResultDto
-    {
-        public string ModelUsed { get; set; }
-        public string DocumentType { get; set; }
-        public Dictionary<string, string> Fields { get; set; }
-        public List<Dictionary<string, string>> Items { get; set; }
+            foreach (var field in document.Fields)
+            {
+                resultDto.Fields[field.Key] = field.Value.Content?.Replace("\n", " ").Trim();
+            }
+
+            if (tables != null && tables.Count > 0)
+            {
+                var extractedTables = new List<Dictionary<string, string>>();
+                foreach (var table in tables)
+                {
+                    foreach (var rowGroup in table.Cells.GroupBy(c => c.RowIndex).OrderBy(g => g.Key))
+                    {
+                        var row = new Dictionary<string, string>();
+                        foreach (var cell in rowGroup.OrderBy(c => c.ColumnIndex))
+                        {
+                            row[$"Column{cell.ColumnIndex + 1}"] = cell.Content?.Replace("\n", " ").Trim();
+                        }
+                        extractedTables.Add(row);
+                    }
+                }
+                resultDto.Items = extractedTables;
+            }
+
+            return resultDto;
+        }
     }
 }

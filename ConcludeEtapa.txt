@@ -333,10 +333,3 @@ foreach (AnalyzedDocument receipt in receipts.Documents)
     }
 }
 
-------------------------------------------------------------
-prebuilt-businessCard
-
-
-
---------------------------------------------------------------------
-prebuilt-document
